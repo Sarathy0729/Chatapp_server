@@ -338,27 +338,37 @@ app.post('/send-group-message', (req, res) => {
   });
 });
 app.get('/group-messages', (req, res) => {
-  console.log("group message",req);
- 
-
+  // console.log("group message",req);
   const  group_id = req.query.group_id; 
-  console.log("id",group_id);
-  
-
-  
+  // console.log("id",group_id);
   const query = ` select group_messages.id , group_messages.group_id,group_messages.sender_id, group_messages.message_text,
  group_messages.sent_at,user.name from group_messages join user on user.id = group_messages.sender_id WHERE group_id = ? `;
   con.query(query, [group_id], (err, results) => {
-    console.log("res",results)
-    if (err) {
-     
+    // console.log("res",results)
+    if (err) {  
       res.json({ success: false, error: 'Failed to fetch group messages' });
     } else {
-      console.log("results",results);
+      // console.log("results",results);
        res.json(  results );
     }
   });
 });
+
+app.get('/group-members',(req,res)=>{
+  console.log("api");
+  const groupid = req.query.group_id;
+  const query = ` select  group_members.group_name ,group_members.user_id , user.Name , group_members.joined_at from group_members join user on group_members.user_id = user.id 
+ where group_members.group_id = ?`;
+ con.query(query,[groupid],(err,result)=>{
+   if (err) {  
+      res.json({ success: false, error: 'Failed to fetch group messages' });
+    } else {
+      console.log("results23232",result);
+       res.json( result );
+    }
+
+ })
+})
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
  });
