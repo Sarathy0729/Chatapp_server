@@ -28,7 +28,7 @@ const transporter = nodemailer.createTransport({
 
 app.post("/send-otp", (req, res) => {
   const email = req.body.email;
-  // console.log("send-otp :",email);
+   console.log("send-otp :",email);
   console.log("hh");
   
 
@@ -36,7 +36,7 @@ app.post("/send-otp", (req, res) => {
   for (let i = 0; i < 4; i++) {
     otp += Math.floor(Math.random() * 10);
   }
-  // console.log("send -otp :",otp);
+   console.log("send -otp :",otp);
 
   otps[email] = otp;
   // console.log(" otps[email] :", otps[email]);
