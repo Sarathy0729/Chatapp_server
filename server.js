@@ -369,6 +369,22 @@ app.get('/group-members',(req,res)=>{
 
  })
 })
+app.post('/remove_members',(req,res)=>{
+  const {group_id,member_id} = req.query;
+  console.log("group_id123",group_id);
+  console.log("member_id",member_id);
+  const query = `DELETE FROM group_members  WHERE (group_id = ? AND user_id = ?)  `;
+  console.log("query",query)
+  con.query = (query,[group_id,member_id],(err,res)=>{
+ 
+        if (err) {
+      console.error('Error Remove_Group-members:', err);
+      return res.json({ success: false, error: 'Internal Server Error' });
+    }
+
+    // res.json({ success: true, message: 'Messages cleared successfully' });
+  })
+})
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
  });
