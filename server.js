@@ -260,6 +260,8 @@ const sql = 'INSERT INTO group_members (id,group_id, user_id, group_name) VALUES
       console.error('Error creating group member:', err);
       errors.push(err.message); 
     }
+    // console.log("Resultresult",result);
+    return res.json(result );
   });
 }
 }
@@ -384,9 +386,28 @@ app.post("/remove_member", (req, res) => {
    console.log("result",result);
     return res.json({ success: "Member removed successfully", result });
    })
+  
     
   
 });
+ app.post("/addMembers",(req,res)=>{
+  console.log("addmembersin group",req.body);
+    const {id,addgroupMembers,groupname} = req.body;
+    console.log("id",id);
+    console.log("groupname",groupname);
+    for(let i =0 ; i < addgroupMembers.length; i++){
+      // console.log("check",addgroupMembers);
+      const user_id = addgroupMembers[i];
+      console.log("helloworld",user_id);
+      const sql = `INSERT INTO group_members(id,group_id,user_id,group_name)VALUES(?,?,?,?)`;
+      con.query(sql,[uuidv4(),id,user_id,groupname],(err,result) => {
+        if(err){
+          console.log("File to addMember in the group");
+        }
+        else{console.log("succes")}
+      }
+ )}
+   })
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
  });
