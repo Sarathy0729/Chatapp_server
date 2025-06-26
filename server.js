@@ -207,6 +207,7 @@ con.query(sql,  (err, result) => {
 
 
 app.get('/messages', (req, res) => {
+  console.log("hello","wkjencwkjebv");
   const { sender_id, receiver_id } = req.query;
   const query = `
     select Messages.id , Messages.sender_id,Messages.receiver_id,Messages.message_text,Messages.sent_at,user.name from
@@ -218,6 +219,7 @@ app.get('/messages', (req, res) => {
     res.json(results);
   });
 });
+
 app.delete('/clear-messages', (req, res) => {
   const { sender_id, receiver_id } = req.body;
   console.log("sender_id",sender_id);
@@ -430,6 +432,32 @@ app.post("/remove_member", (req, res) => {
     })
 
     
+   })
+   app.delete('/clear-groupmessages',(req,res)=>{
+    const groupid = req.body.group_ID;
+    console.log("groupid",groupid);
+    const query = "DELETE FROM group_messages WHERE group_id = ?";
+    con.query(query,[groupid],(err,result)=>{
+      if(err){
+         console.error('Error clearing messages:', err);
+      return res.json({ success: false, error: 'Internal Server Error' });
+      }
+       res.json({ success: true, message: 'Messages cleared successfully' });
+    })
+   })
+   app.delete('/clear-singlegroupmsg',(req,res)=>{
+    const id = req.query.groupid;
+    console.log("groupid",id);
+    const sql = "DELETE FROM group_messages WHERE id =?";
+    con.query(sql,[id],(err,result)=>{
+      if(err){
+        console.log("error");
+      }
+       else{
+        console.log("delete");
+        return res.send({success:true});
+      }
+    })
    })
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
