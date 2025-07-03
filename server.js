@@ -210,8 +210,9 @@ con.query(sql,  (err, result) => {
 
 
 app.get('/messages', (req, res) => {
+  // console.log("run");
   const { sender_id, receiver_id } = req.query;
-  console.log("tick");
+  
 //    const sql= `UPDATE Messages
 // SET is_read = '1'
 // WHERE (sender_id = ? and  receiver_id = ? );
@@ -227,7 +228,6 @@ app.get('/messages', (req, res) => {
 
   con.query(query, [sender_id, receiver_id, receiver_id, sender_id], (err, results) => {
     if (err) return res.json({ error: err.message });
-    console.log("final")
     res.json(results);
     
   });
@@ -353,7 +353,7 @@ app.get('/group-info', (req, res) => {
   // console.log("groupinfo",req.query.user_id)
   const user_id =req.query.user_id;
   // console.log("user_id",user_id);
-  const sql = 'SELECT createGroup.id,createGroup.group_name,createGroup.create_by,createGroup.images FROM createGroup JOIN group_members ON createGroup.id = group_members.group_id WHERE group_members.user_id = ?';
+  const sql = 'SELECT createGroup.id,createGroup.group_name,createGroup.create_by,createGroup.images,createGroup.is_admin FROM createGroup JOIN group_members ON createGroup.id = group_members.group_id WHERE group_members.user_id = ?';
    con.query(sql,[user_id] , (err, result) => {
         if (err) {
           console.error('Error fetching group:', err);
@@ -427,16 +427,15 @@ app.get('/group-messages', (req, res) => {
 });
 
 app.get('/group-members',(req,res)=>{
-  console.log("api");
   const groupid = req.query.group_id;
-  const query = ` select  group_members.group_name ,group_members.user_id , user.Name , group_members.joined_at from group_members join user on group_members.user_id = user.id 
+  const query = ` select  group_members.group_name ,group_members.user_id , user.Name ,user.images, group_members.joined_at from group_members join user on group_members.user_id = user.id 
  where group_members.group_id = ?`;
  con.query(query,[groupid],(err,result)=>{
    if (err) {  
       res.json({ success: false, error: 'Failed to fetch group messages' });
     } else {
-      console.log("results23232",result);
-       res.json( result );
+     
+           res.json( result );
     }
  })
 })
@@ -531,6 +530,91 @@ app.post("/addMembers", (req, res) => {
       }
     })
    })
+   app.patch("/update",(req,res)=>{
+    const {name,image,id}=req.body;
+    if(name && image){
+    const sql = "UPDATE user set Name = ? , images = ? WHERE id = ?";
+    con.query(sql,[name,image,id],(err,result) => {
+      if(err){
+        console.log("err");
+      }
+      console.log("both")
+      res.send({ success: true,message: 'updated successfully' });
+
+    })
+  }
+  else if(name){
+     const sql = "UPDATE user set Name = ? WHERE id = ?";
+    con.query(sql,[name,id],(err,result) => {
+      if(err){
+        console.log("err");
+      }
+      console.log("name")
+      res.send({ success: true,message: 'updated successfully' });
+
+    })
+
+  }
+  else{
+    const sql = "UPDATE user set images = ? WHERE id = ?";
+    con.query(sql,[image,id],(err,result) => {
+      if(err){
+
+        console.log("err");
+      }
+      console.log("images")
+      res.send({ success: true,message: 'updated successfully' });
+
+    })
+    
+
+  }
+   })
+   app.patch("/updateGroup",(req,res)=>{
+    const {id,group_image,group_name}=req.body;
+    console.log("id",id);
+    console.log("group_id",group_image);
+    console.log("group_name",group_name);
+    if(group_image && group_name){
+      console.log("all");
+    const sql = "UPDATE createGroup set group_name = ? , images = ? WHERE id = ?";
+    con.query(sql,[group_name,group_image,id],(err,result)=>{
+      if(err){
+        console.log("err");
+      }
+      res.send({ success: true,message: 'updated successfully' });
+    })
+  }
+  else if(group_name){
+    console.log("name");
+    const sql = "UPDATE createGroup set group_name = ?  WHERE id = ?";
+    con.query(sql,[group_name,id],(err,result) => {
+      if(err){
+        console.log("err");
+      }
+      console.log("name")
+      res.send({ success: true,message: 'updated successfully' });
+
+    })
+  }
+  else{
+      const sql = "UPDATE createGroup set images = ?  WHERE id = ?";
+    con.query(sql,[group_image,id],(err,result) => {
+      if(err){
+        console.log("err");
+      }
+      console.log("images")
+      res.send({ success: true,message: 'updated successfully' });
+
+    })
+
+  }
+   })
+
+  //  app.post("/wallpaper",(req,res)=>{
+  // console.log("wallpaper");
+  //  })
+  
    
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
