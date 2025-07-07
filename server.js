@@ -6,6 +6,7 @@ const mysql = require("mysql");
 const bcrypt = require("bcrypt");
 const { generateToken } = require('./jwtUtils');
 const {v4 : uuidv4} = require('uuid');
+const { access } = require("fs");
 
 
 const app = express();
@@ -256,95 +257,114 @@ const query =
 });
 
 // app.post('/create-group', (req, res) => {
-//   const { groupName, groupMembers, createdBy } = req.body; 
-// const query = 'INSERT INTO createGroup (id,group_name, create_by) VALUES (?,?,?)';
-//   con.query(query, [uuidv4(),groupName, createdBy], (err, result) => {
-//      const qry = 'select id from createGroup where group_name = ? ';
-//      con.query(qry,[groupName],(err,results)=>{
-//           if (err) {
-//       console.error('Error creating group:', err);
-//       res.json({ success: false, error: err.message });
-      
-//     } else {   
-//            let string=results;
-//       console.log('group.id: ', string[0].id);
-//       id = string[0].id;
-//         console.log("value",id);
-//              for (let i = 0; i < groupMembers.length; i++) {
-//   user_id = groupMembers[i];
-// const sql = 'INSERT INTO group_members (id,group_id, user_id, group_name) VALUES (?, ?, ?,?)';
-//   console.log("uuidv4",uuidv4);
-//   console.log("value",id);
-//   console.log("user_id",user_id);
-//   console.log("groupName",groupName);
-//   con.query(sql, [uuidv4(),id, user_id, groupName], (err, result) => {
+//   const { groupName, groupMembers, createdBy,image } = req.body;
+// const admin = true;
+//   const query = 'INSERT INTO createGroup (id, group_name, create_by,is_admin,images) VALUES (?, ?, ?,?,?)';
+//   con.query(query, [uuidv4(), groupName, createdBy,admin,image], (err) => {
 //     if (err) {
-//       console.error('Error creating group member:', err);
-//       errors.push(err.message); 
+//       console.error('Error creating group:', err);
+//       return res.json({ success: false, error: err.message });
 //     }
-//     // console.log("Resultresult",result);
-//     return res.json(result );
+
+//     const qry = 'SELECT id FROM createGroup WHERE group_name = ?';
+//     con.query(qry, [groupName], (err, results) => {
+//       if (err) {
+//         console.error('Error fetching group ID:', err);
+//         return res.json({ success: false, error: err.message });
+//       }
+
+//       const groupId = results[0].id;
+//       let completed = 0;
+//       let errors = [];
+
+//       if (groupMembers.length === 0) {
+//         return res.json({ success: true, message: "Group created with no members" });
+//       }
+
+//       groupMembers.forEach((userId) => {
+//         const sql = 'INSERT INTO group_members (id, group_id, user_id, group_name) VALUES (?, ?, ?, ?)';
+//         con.query(sql, [uuidv4(), groupId, userId, groupName], (err) => {
+//           completed++;
+//           if (err) {
+//             console.error('Error inserting group member:', err);
+//             errors.push(err.message);
+//           }
+
+         
+//           if (completed === groupMembers.length) {
+//             if (errors.length > 0) {
+//               res.json({ success: false, errors });
+//             } else {
+//               res.json({ success: true, groupId });
+//             }
+//           }
+//         });
+//       });
+//     });
 //   });
-// }
-// }
-//      })
-
-//     if (err) {
-//       console.error('Error creating group:', err);
-//       res.json({ success: false, error: err.message });
-      
-//     } else {
-
-
-//   res.json({ success: true });
-// } 
-//  });
 // });
 app.post('/create-group', (req, res) => {
-  const { groupName, groupMembers, createdBy,image } = req.body;
-const admin = true;
-  const query = 'INSERT INTO createGroup (id, group_name, create_by,is_admin,images) VALUES (?, ?, ?,?,?)';
-  con.query(query, [uuidv4(), groupName, createdBy,admin,image], (err) => {
+  const { groupName, groupMembers, createdBy, image } = req.body;
+
+  const groupId = uuidv4();
+  const createGroupQuery = `
+    INSERT INTO createGroup (id, group_name, create_by, is_active, images)
+    VALUES (?, ?, ?, ?, ?)`;
+
+  con.query(createGroupQuery, [groupId, groupName, createdBy, true, image], (err) => {
     if (err) {
       console.error('Error creating group:', err);
       return res.json({ success: false, error: err.message });
     }
 
-    const qry = 'SELECT id FROM createGroup WHERE group_name = ?';
-    con.query(qry, [groupName], (err, results) => {
-      if (err) {
-        console.error('Error fetching group ID:', err);
-        return res.json({ success: false, error: err.message });
-      }
+   
+    const creatorInsertQuery = `
+      INSERT INTO group_members (id, group_id, user_id, group_name, is_active, is_admin)
+      VALUES (?, ?, ?, ?, ?, ?)`;
 
-      const groupId = results[0].id;
-      let completed = 0;
-      let errors = [];
+    con.query(
+      creatorInsertQuery,
+      [uuidv4(), groupId, createdBy, groupName, true, true],
+      (err) => {
+        if (err) {
+          console.error('Error inserting creator into group_members:', err);
+          return res.json({ success: false, error: err.message });
+        }
 
-      if (groupMembers.length === 0) {
-        return res.json({ success: true, message: "Group created with no members" });
-      }
+        if (groupMembers.length === 0) {
+          return res.json({ success: true, groupId, message: "Group created with only admin" });
+        }
 
-      groupMembers.forEach((userId) => {
-        const sql = 'INSERT INTO group_members (id, group_id, user_id, group_name) VALUES (?, ?, ?, ?)';
-        con.query(sql, [uuidv4(), groupId, userId, groupName], (err) => {
-          completed++;
-          if (err) {
-            console.error('Error inserting group member:', err);
-            errors.push(err.message);
-          }
+        let completed = 0;
+        let errors = [];
 
-         
-          if (completed === groupMembers.length) {
-            if (errors.length > 0) {
-              res.json({ success: false, errors });
-            } else {
-              res.json({ success: true, groupId });
+        groupMembers.forEach((userId) => {
+          const memberInsertQuery = `
+            INSERT INTO group_members (id, group_id, user_id, group_name, is_active, is_admin)
+            VALUES (?, ?, ?, ?, ?, ?)`;
+
+          con.query(
+            memberInsertQuery,
+            [uuidv4(), groupId, userId, groupName, true, false],
+            (err) => {
+              completed++;
+              if (err) {
+                console.error('Error inserting member:', err);
+                errors.push({ userId, error: err.message });
+              }
+
+              if (completed === groupMembers.length) {
+                if (errors.length > 0) {
+                  return res.json({ success: false, groupId, errors });
+                } else {
+                  return res.json({ success: true, groupId });
+                }
+              }
             }
-          }
+          );
         });
-      });
-    });
+      }
+    );
   });
 });
 
@@ -364,38 +384,38 @@ app.get('/group-info', (req, res) => {
     });
 
    
-   app.post('/block-user', (req, res) => {
-  const { blocker_id, blocked_id } = req.body;
- const blockUser = `INSERT INTO blocked_users (blocker_id, blocked_id) VALUES (?, ?) `;
+//    app.post('/block-user', (req, res) => {
+//   const { blocker_id, blocked_id } = req.body;
+//  const blockUser = `INSERT INTO blocked_users (blocker_id, blocked_id) VALUES (?, ?) `;
 
-  con.query(blockUser, [blocker_id, blocked_id], (error, results) => {
-    if (error) {
-      console.error('Error blocking user:', error);
-      return res.json({ success: false, error: 'Database error' });
-    }
+//   con.query(blockUser, [blocker_id, blocked_id], (error, results) => {
+//     if (error) {
+//       console.error('Error blocking user:', error);
+//       return res.json({ success: false, error: 'Database error' });
+//     }
 
-    res.json({ success: true });
-  });
-});
+//     res.json({ success: true });
+//   });
+// });
 
-app.post('/unblock-user', (req, res) => {
-  const { blocker_id, blocked_id } = req.body;
-  // console.log("block_id",blocker_id);
-  // console.log("blocked",blocked_id);
- const unblockUser = ` DELETE FROM blocked_users WHERE blocker_id = ? AND blocked_id = ?`;
- con.query(unblockUser, [blocker_id, blocked_id], (error, results) => {
-    if (error) {
-      console.error('Error unblocking user:', error);
-      return res.json({ success: false, error: 'Database error' });
-    }
+// app.post('/unblock-user', (req, res) => {
+//   const { blocker_id, blocked_id } = req.body;
+//   // console.log("block_id",blocker_id);
+//   // console.log("blocked",blocked_id);
+//  const unblockUser = ` DELETE FROM blocked_users WHERE blocker_id = ? AND blocked_id = ?`;
+//  con.query(unblockUser, [blocker_id, blocked_id], (error, results) => {
+//     if (error) {
+//       console.error('Error unblocking user:', error);
+//       return res.json({ success: false, error: 'Database error' });
+//     }
 
-    if (results.affectedRows > 0) {
-      res.json({ success: true });
-    } else {
-      res.json({ success: false, error: 'Block record not found' });
-    }
-  });
-});
+//     if (results.affectedRows > 0) {
+//       res.json({ success: true });
+//     } else {
+//       res.json({ success: false, error: 'Block record not found' });
+//     }
+//   });
+// });
 
 app.post('/send-group-message', (req, res) => {
   const { group_id, sender_id, message_text } = req.body;
@@ -428,7 +448,7 @@ app.get('/group-messages', (req, res) => {
 
 app.get('/group-members',(req,res)=>{
   const groupid = req.query.group_id;
-  const query = ` select  group_members.group_name ,group_members.user_id , user.Name ,user.images, group_members.joined_at from group_members join user on group_members.user_id = user.id 
+  const query = ` select  group_members.group_name ,group_members.user_id , user.Name ,user.images,group_members.is_admin, group_members.joined_at from group_members join user on group_members.user_id = user.id 
  where group_members.group_id = ?`;
  con.query(query,[groupid],(err,result)=>{
    if (err) {  
@@ -611,10 +631,63 @@ app.post("/addMembers", (req, res) => {
   }
    })
 
-  //  app.post("/wallpaper",(req,res)=>{
-  // console.log("wallpaper");
-  //  })
-  
+   app.post("/wallpaper",(req,res)=>{
+  console.log("wallpaper");
+  const{sender_id,wallpaper,receiver_id}=req.body;
+  console.log("sender_id",sender_id);
+  console.log("receiver_id",receiver_id);
+  console.log("wallpaper",wallpaper);
+  // const sql = "select * from private_message_wallpaper where sender_id = ? and receiver_id = ? "
+  // con.query(sql,[sender_id,receiver_id],(err,result)=>{})
+  const query = " insert into private_message_wallpaper(id , sender_id,receiver_id,char_window_wallpaper) VALUES (?,?,?,?)";
+  con.query(query,[uuidv4(),sender_id,receiver_id,wallpaper],(err,result)=>{
+    if(err){
+       console.error("Database error:", err);
+      return res.json({ error: "Internal server error" });
+    }
+    res.json({ success: true, message: 'wallpaper upload successfully' });
+  })
+
+   })
+//    app.get("/last-group-messages", (req, res) => {
+//   const userId = req.query.user_id;
+
+//   const query = `
+//     SELECT g.id, g.group_name, g.images, gm.message_text AS last_message, gm.send_at
+//     FROM createGroup g
+//     JOIN group_members gmbr ON g.id = gmbr.group_id
+//     LEFT JOIN (
+//         SELECT group_id, MAX(send_at) AS last_time
+//         FROM group_messages
+//         GROUP BY group_id
+//     ) last_msg_time ON g.id = last_msg_time.group_id
+//     LEFT JOIN group_messages gm 
+//       ON gm.group_id = g.id AND gm.send_at = last_msg_time.last_time
+//     WHERE gmbr.user_id = ?
+//     ORDER BY gm.send_at DESC
+//   `;
+
+//   con.query(query, [userId], (err, result) => {
+//     if (err) {
+//       console.error("Error fetching last group messages:", err);
+//       return res.json({ success: false, error: err.message });
+//     }
+//     res.json(result);
+//   });
+// });
+
+  app.get('/getwallpaper',(req,res)=>{
+    const{sender_id,receiver_id}=req.query;
+    console.log("sender_id",sender_id);
+    console.log("receiver",receiver_id);
+    const sql = "select * from private_message_wallpaper where sender_id = ? AND receiver_id = ? ";
+    con.query(sql,[sender_id,receiver_id],(err,results)=>{
+
+      if (err) return res.json(console.log("err..."));
+      console.log("access",results);
+    res.json(results);
+    })
+  })
    
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
