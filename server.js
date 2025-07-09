@@ -6,8 +6,7 @@ const mysql = require("mysql");
 const bcrypt = require("bcrypt");
 const { generateToken } = require('./jwtUtils');
 const {v4 : uuidv4} = require('uuid');
-const { access } = require("fs");
-
+const multer = require('multer');
 
 const app = express();
 const port = 3005;
@@ -15,7 +14,8 @@ const newId = uuidv4()
 var id;
 
 app.use(cors());
-app.use(bodyParser.json());
+app.use(bodyParser.json({ limit: '50mb' })); 
+app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }));
 
 const otps = {};
 
@@ -126,8 +126,8 @@ app.post("/signup", (req, res) => {
 
 app.post("/login", (req, res) => {6777
 const { email, password } = req.body;
-// console.log("login email:", email);
-// console.log("login password:", password);
+console.log("login email:", email);
+console.log("login password:", password);
 
 const sql = "SELECT * FROM user WHERE gmail = ?";
 con.query(sql, [email], (err, result) => {
@@ -151,7 +151,7 @@ con.query(sql, [email], (err, result) => {
     }
 
     if (match) {
-      console.log("match", match);
+      // console.log("match", match);
       const token = generateToken({ email: user.gmail, name: user.Name, password: user.password,images:user.images, id: user.id });
       const id = user.id;
       const name = user.Name;
@@ -471,7 +471,7 @@ app.post("/remove_member", (req, res) => {
       return res.json({ error: "Failed to remove group member" });
     }
 
-   console.log("result",result);
+  //  console.log("result",result);
     return res.json({ success: "Member removed successfully", result });
    })
   
@@ -631,63 +631,143 @@ app.post("/addMembers", (req, res) => {
   }
    })
 
-   app.post("/wallpaper",(req,res)=>{
-  console.log("wallpaper");
-  const{sender_id,wallpaper,receiver_id}=req.body;
-  console.log("sender_id",sender_id);
-  console.log("receiver_id",receiver_id);
-  console.log("wallpaper",wallpaper);
-  // const sql = "select * from private_message_wallpaper where sender_id = ? and receiver_id = ? "
-  // con.query(sql,[sender_id,receiver_id],(err,result)=>{})
-  const query = " insert into private_message_wallpaper(id , sender_id,receiver_id,char_window_wallpaper) VALUES (?,?,?,?)";
-  con.query(query,[uuidv4(),sender_id,receiver_id,wallpaper],(err,result)=>{
-    if(err){
-       console.error("Database error:", err);
+
+app.post("/groupwallpaper", (req, res) => {
+  const { group_id, wallpaper } = req.body;
+
+  // console.log("group_id:", group_id);
+  // console.log("wallpaper:", wallpaper);
+  const sql = "SELECT * FROM group_message_wallpaper WHERE group_id = ? ";
+  con.query(sql, [group_id], (err, result) => {
+    if (err) {
+      console.error("Database check error:", err);
       return res.json({ error: "Internal server error" });
     }
-    res.json({ success: true, message: 'wallpaper upload successfully' });
-  })
 
-   })
-//    app.get("/last-group-messages", (req, res) => {
-//   const userId = req.query.user_id;
+    if (result.length > 0) {
+      console.log("group-update");
+      const query = "UPDATE group_message_wallpaper SET chat_window_wallpaper = ? WHERE group_id = ?";
+      con.query(query, [wallpaper, group_id], (err, result) => {
+        if (err) {
+          console.error("Update error:", err);
+          return res.json({ error: "Failed to update wallpaper" });
+        }
+        return res.json({ success: true, message: "Wallpaper updated successfully" });
+      });
+    } else {
+      console.log("group-insert",group_id);
+      const sql = "INSERT INTO group_message_wallpaper (id, group_id, chat_window_wallpaper) VALUES (?, ?, ?)";
+      con.query(sql, [uuidv4(), group_id, wallpaper], (err, result) => {
+        if (err) {
+          console.log("err",err);
+          return res.json({ error: "Failed to insert wallpaper" });
+        }
+        return res.json({ success: true, message: "Wallpaper uploaded successfully" });
+      });
+    }
+  });
+});
+app.post("/wallpaper", (req, res) => {
+  const { sender_id, wallpaper, receiver_id } = req.body;
 
-//   const query = `
-//     SELECT g.id, g.group_name, g.images, gm.message_text AS last_message, gm.send_at
-//     FROM createGroup g
-//     JOIN group_members gmbr ON g.id = gmbr.group_id
-//     LEFT JOIN (
-//         SELECT group_id, MAX(send_at) AS last_time
-//         FROM group_messages
-//         GROUP BY group_id
-//     ) last_msg_time ON g.id = last_msg_time.group_id
-//     LEFT JOIN group_messages gm 
-//       ON gm.group_id = g.id AND gm.send_at = last_msg_time.last_time
-//     WHERE gmbr.user_id = ?
-//     ORDER BY gm.send_at DESC
-//   `;
+  // console.log("sender_id:", sender_id);
+  // console.log("receiver_id:", receiver_id);
+  // console.log("wallpaper:", wallpaper);
+  const sql = "SELECT * FROM private_message_wallpaper WHERE sender_id = ? AND receiver_id = ?";
+  con.query(sql, [sender_id, receiver_id], (err, result) => {
+    if (err) {
+      console.error("Database check error:", err);
+      return res.json({ error: "Internal server error" });
+    }
 
-//   con.query(query, [userId], (err, result) => {
-//     if (err) {
-//       console.error("Error fetching last group messages:", err);
-//       return res.json({ success: false, error: err.message });
-//     }
-//     res.json(result);
-//   });
-// });
+    if (result.length > 0) {
+      console.log("dnvefvner")
+      const query = "UPDATE private_message_wallpaper SET char_window_wallpaper = ? WHERE sender_id = ? AND receiver_id = ?";
+      con.query(query, [wallpaper, sender_id, receiver_id], (err, updateResult) => {
+        if (err) {
+          console.error("Update error:", err);
+          return res.json({ error: "Failed to update wallpaper" });
+        }
+        return res.json({ success: true, message: "Wallpaper updated successfully" });
+      });
+    } else {
+      const sql = "INSERT INTO private_message_wallpaper (id, sender_id, receiver_id, char_window_wallpaper) VALUES (?, ?, ?, ?)";
+      con.query(sql, [uuidv4(), sender_id, receiver_id, wallpaper], (err, insertResult) => {
+        if (err) {
+          return res.json({ error: "Failed to insert wallpaper" });
+        }
+        return res.json({ success: true, message: "Wallpaper uploaded successfully" });
+      });
+    }
+  });
+});
+
 
   app.get('/getwallpaper',(req,res)=>{
     const{sender_id,receiver_id}=req.query;
-    console.log("sender_id",sender_id);
-    console.log("receiver",receiver_id);
+    // console.log("sender_id",sender_id);
+    // console.log("receiver",receiver_id);
     const sql = "select * from private_message_wallpaper where sender_id = ? AND receiver_id = ? ";
     con.query(sql,[sender_id,receiver_id],(err,results)=>{
 
       if (err) return res.json(console.log("err..."));
-      console.log("access",results);
     res.json(results);
     })
   })
+
+    app.get('/getgroupwallpaper',(req,res)=>{
+    const{group_id}=req.query;
+    // console.log("group_id",group_id);
+    const sql = "select * from group_message_wallpaper where group_id = ? ";
+    con.query(sql,[group_id],(err,results)=>{
+
+      if (err) return res.json(console.log("err..."));
+      // console.log("result",results);
+     
+    res.json(results);
+    })
+  })
+  app.delete('/remove_wallpaper',(req,res)=>{
+    const{sender_id,receiver_id}=req.body;
+    const sql = "delete from  private_message_wallpaper where sender_id = ? and receiver_id = ?";
+    con.query(sql,[sender_id,receiver_id],(err,result)=>{
+      if(err){
+        console.log("error cant delete wallpaper")
+      }
+      else{
+        console.log("delete wallpaper");
+        return res.send({sucess:true})
+      }
+    })
+  })
+  app.delete('/remove_groupwallpaper',(req,res)=>{
+    const{group_ID}=req.body;
+    const sql = "delete from group_message_wallpaper where group_id = ?";
+    con.query(sql,[group_ID],(err,result)=>{
+      if(err){
+        console.log("error can't delete wallpaper")
+      }
+      else{
+        return res.send({sucess:true})
+      }
+    })
+  })
+
+  // app.get('/last-message',(req,res)=>{
+  //   const{sender_id,receiver_id}=req.query;
+  //   console.log("hhhh")
+  //   console.log("sender_id",sender_id);
+  //   console.log("receiver_id",receiver_id);
+  //   const sql = "select message_text from Messages where sender_id = ? and receiver_id = ? order by sent_at desc limit 1 ;"
+  //   con.query(sql,[sender_id,receiver_id],(err,result)=>{
+  //     if(err)
+  //       console.log("error fetch last message")
+      
+  //     res.json(result);
+  //   })
+  // })
+
+
    
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
