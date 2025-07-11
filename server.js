@@ -307,23 +307,23 @@ app.post('/create-group', (req, res) => {
   const { groupName, groupMembers, createdBy, image } = req.body;
 
   const groupId = uuidv4();
-  const createGroupQuery = `
+  const sql = `
     INSERT INTO createGroup (id, group_name, create_by, is_active, images)
     VALUES (?, ?, ?, ?, ?)`;
 
-  con.query(createGroupQuery, [groupId, groupName, createdBy, true, image], (err) => {
+  con.query(sql, [groupId, groupName, createdBy, true, image], (err) => {
     if (err) {
       console.error('Error creating group:', err);
       return res.json({ success: false, error: err.message });
     }
 
    
-    const creatorInsertQuery = `
+    const query = `
       INSERT INTO group_members (id, group_id, user_id, group_name, is_active, is_admin)
       VALUES (?, ?, ?, ?, ?, ?)`;
 
     con.query(
-      creatorInsertQuery,
+      query,
       [uuidv4(), groupId, createdBy, groupName, true, true],
       (err) => {
         if (err) {
@@ -339,12 +339,12 @@ app.post('/create-group', (req, res) => {
         let errors = [];
 
         groupMembers.forEach((userId) => {
-          const memberInsertQuery = `
+          const sql = `
             INSERT INTO group_members (id, group_id, user_id, group_name, is_active, is_admin)
             VALUES (?, ?, ?, ?, ?, ?)`;
 
           con.query(
-            memberInsertQuery,
+            sql,
             [uuidv4(), groupId, userId, groupName, true, false],
             (err) => {
               completed++;
@@ -753,21 +753,74 @@ app.post("/wallpaper", (req, res) => {
     })
   })
 
-  // app.get('/last-message',(req,res)=>{
-  //   const{sender_id,receiver_id}=req.query;
-  //   console.log("hhhh")
-  //   console.log("sender_id",sender_id);
-  //   console.log("receiver_id",receiver_id);
-  //   const sql = "select message_text from Messages where sender_id = ? and receiver_id = ? order by sent_at desc limit 1 ;"
-  //   con.query(sql,[sender_id,receiver_id],(err,result)=>{
-  //     if(err)
-  //       console.log("error fetch last message")
-      
-  //     res.json(result);
-  //   })
-  // })
+app.get('/last-message', (req, res) => {
+  const { sender_id, receiver_id } = req.query;
+  // console.log(sender_id);
 
+  const sql = `
+    SELECT message_text, sent_at 
+    FROM Messages 
+    WHERE 
+      (sender_id = ? AND receiver_id = ?)  
+    ORDER BY sent_at DESC 
+    LIMIT 1;
+  `;
 
+  con.query(sql, [sender_id, receiver_id, receiver_id, sender_id], (err, result) => {
+    if (err) {
+      console.log("Error fetching last message:", err);
+      return res.json({ error: "Failed to fetch last message" });
+    }
+console.log("result0",result)
+    if (result.length > 0) {
+      console.log("result",result);
+      res.json(result[0]);
+    } else {
+      console.log("result2",result);
+      res.json({ message_text: "" ,sent_at: null });
+    }
+  });
+});
+
+app.get('/last-group-message', (req, res) => {
+  const { group_id } = req.query;
+
+  const sql = `
+    SELECT message_text, sent_at
+    FROM group_messages
+    WHERE group_id = ?
+    ORDER BY sent_at DESC
+    LIMIT 1
+  `;
+
+  con.query(sql, [group_id], (err, result) => {
+    if (err) {
+      console.log("Error fetching last group message:", err);
+      return res.json({ error: "Failed to fetch last group message" });
+    }
+
+    if (result.length > 0) {
+      console.log("hrlo",result)
+      res.json(result[0]);
+    } else {
+      res.json({ message_text: "", sent_at: null });
+    }
+  });
+});
+app.post('/file_upload',(req,res)=>{
+  console.log("req.query",req.query);
+  const { sender_id,recevier_id,file}= req.query;
+  console.log("sender_d222",sender_id);
+  console.log("receiver_id111",recevier_id);
+  console.log("files",file);
+   const sql = `insert into private_message_files (id ,sender_id,recevier_id , filepath ) values (? , ? , ?, ?)`;
+   con.query(sql,[uuidv4(),sender_id,recevier_id,file],(err,result)=>{
+    if(err){
+      return res.json({error:"Failed to save file"})
+    }
+    return res.json({success:true,message:"file upload successfully"});
+   })
+})
    
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
