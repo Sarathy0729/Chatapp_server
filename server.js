@@ -6,12 +6,14 @@ const mysql = require("mysql");
 const bcrypt = require("bcrypt");
 const { generateToken } = require('./jwtUtils');
 const {v4 : uuidv4} = require('uuid');
-const multer = require('multer');
+const multer = require("multer");
+const storage = multer.memoryStorage();
+const upload = multer({ storage});
 
 const app = express();
 const port = 3005;
 const newId = uuidv4()
-var id;
+
 
 app.use(cors());
 app.use(bodyParser.json({ limit: '50mb' })); 
@@ -111,9 +113,9 @@ app.post("/signup", (req, res) => {
       return res.send("Error encrypting password");
     }
 
-    const sql = "INSERT INTO user (id ,name, gmail, password , images) VALUES (?, ?,?,?,?)";
+    const sql = "INSERT INTO user (id ,name, gmail, password , images,is_active) VALUES (?, ?,?,?,?,?)";
     // console.log("sql :",sql,hash);
-    con.query(sql, [uuidv4(),name, email, hash,image], (err, result) => {
+    con.query(sql, [uuidv4(),name, email, hash,image,true], (err, result) => {
       // console.log("sql query:",err,result);
       
       if (err) {
@@ -124,7 +126,7 @@ app.post("/signup", (req, res) => {
   });
 });
 
-app.post("/login", (req, res) => {6777
+app.post("/login", (req, res) => {
 const { email, password } = req.body;
 console.log("login email:", email);
 console.log("login password:", password);
@@ -155,7 +157,7 @@ con.query(sql, [email], (err, result) => {
       const token = generateToken({ email: user.gmail, name: user.Name, password: user.password,images:user.images, id: user.id });
       const id = user.id;
       const name = user.Name;
-      const images=user.images
+      const images=user.images;
    return res.json({ message: "Login successful", token, email, password, name, id, images });
     } else {
       return res.send("Invalid password");
@@ -197,7 +199,7 @@ app.post('/send-message', (req, res) => {
 });
 
 app.get("/user-profile", (req, res) => {
-  const sql = "SELECT * FROM user" ;
+  const sql = "SELECT * FROM user where is_active = 1" ;
   
 con.query(sql,  (err, result) => {
    
@@ -384,38 +386,41 @@ app.get('/group-info', (req, res) => {
     });
 
    
-//    app.post('/block-user', (req, res) => {
-//   const { blocker_id, blocked_id } = req.body;
-//  const blockUser = `INSERT INTO blocked_users (blocker_id, blocked_id) VALUES (?, ?) `;
+   app.post('/block-user', (req, res) => {
+    console.log("blocked user",req.body)
+  const { sender_id, receiver_id } = req.body;
+ console.log("sender_id",sender_id);
+ console.log("receiver_id",receiver_id);
+ const blockUser = `INSERT INTO blocked_users (id,blocker_id,blocked_id) VALUES (?, ?,?) `;
+con.query(blockUser, [uuidv4(),sender_id, receiver_id], (error, results) => {
+    if (error) {
+      console.error('Error blocking user:', error);
+      return res.json({ success: false, error: 'Database error' });
+    }
 
-//   con.query(blockUser, [blocker_id, blocked_id], (error, results) => {
-//     if (error) {
-//       console.error('Error blocking user:', error);
-//       return res.json({ success: false, error: 'Database error' });
-//     }
+    res.json({ success: true });
+  });
+});
 
-//     res.json({ success: true });
-//   });
-// });
+app.post('/unblock-user', (req, res) => {
+  const { sender_id, receiver_id } = req.body;
+  console.log("unblock-sender_id ",sender_id);
+  console.log("unblock-reciver_id",receiver_id);
+ 
+ const unblockUser = ` DELETE FROM blocked_users WHERE blocker_id = ? AND blocked_id = ?`;
+ con.query(unblockUser, [sender_id, receiver_id], (error, results) => {
+    if (error) {
+      console.error('Error unblocking user:', error);
+      return res.json({ success: false, error: 'Database error' });
+    }
 
-// app.post('/unblock-user', (req, res) => {
-//   const { blocker_id, blocked_id } = req.body;
-//   // console.log("block_id",blocker_id);
-//   // console.log("blocked",blocked_id);
-//  const unblockUser = ` DELETE FROM blocked_users WHERE blocker_id = ? AND blocked_id = ?`;
-//  con.query(unblockUser, [blocker_id, blocked_id], (error, results) => {
-//     if (error) {
-//       console.error('Error unblocking user:', error);
-//       return res.json({ success: false, error: 'Database error' });
-//     }
-
-//     if (results.affectedRows > 0) {
-//       res.json({ success: true });
-//     } else {
-//       res.json({ success: false, error: 'Block record not found' });
-//     }
-//   });
-// });
+    if (results.affectedRows > 0) {
+      res.json({ success: true });
+    } else {
+      res.json({ success: false, error: 'Block record not found' });
+    }
+  });
+});
 
 app.post('/send-group-message', (req, res) => {
   const { group_id, sender_id, message_text } = req.body;
@@ -449,7 +454,7 @@ app.get('/group-messages', (req, res) => {
 app.get('/group-members',(req,res)=>{
   const groupid = req.query.group_id;
   const query = ` select  group_members.group_name ,group_members.user_id , user.Name ,user.images,group_members.is_admin, group_members.joined_at from group_members join user on group_members.user_id = user.id 
- where group_members.group_id = ?`;
+ where group_members.group_id = ? `;
  con.query(query,[groupid],(err,result)=>{
    if (err) {  
       res.json({ success: false, error: 'Failed to fetch group messages' });
@@ -473,9 +478,7 @@ app.post("/remove_member", (req, res) => {
 
   //  console.log("result",result);
     return res.json({ success: "Member removed successfully", result });
-   })
-  
-    
+   })  
   
 });
 app.post("/addMembers", (req, res) => {
@@ -771,12 +774,12 @@ app.get('/last-message', (req, res) => {
       console.log("Error fetching last message:", err);
       return res.json({ error: "Failed to fetch last message" });
     }
-console.log("result0",result)
+// console.log("result0",result)
     if (result.length > 0) {
-      console.log("result",result);
+     
       res.json(result[0]);
     } else {
-      console.log("result2",result);
+      // console.log("result2",result);
       res.json({ message_text: "" ,sent_at: null });
     }
   });
@@ -800,31 +803,81 @@ app.get('/last-group-message', (req, res) => {
     }
 
     if (result.length > 0) {
-      console.log("hrlo",result)
+     
       res.json(result[0]);
     } else {
       res.json({ message_text: "", sent_at: null });
     }
   });
 });
-app.post('/file_upload',(req,res)=>{
-  console.log("req.query",req.query);
-  const { sender_id,recevier_id,file}= req.query;
-  console.log("sender_d222",sender_id);
-  console.log("receiver_id111",recevier_id);
-  console.log("files",file);
-   const sql = `insert into private_message_files (id ,sender_id,recevier_id , filepath ) values (? , ? , ?, ?)`;
-   con.query(sql,[uuidv4(),sender_id,recevier_id,file],(err,result)=>{
-    if(err){
-      return res.json({error:"Failed to save file"})
-    }
-    return res.json({success:true,message:"file upload successfully"});
-   })
+app.post('/file_upload',upload.single('file'),(req,res)=>{
+
+  console.log("file----++---file",req.body.file);
 })
+
+// app.post('/file_upload',(req,res)=>{
+//   console.log("jjjjj");
+//   // console.log("req.query",req.query);
+//   const{sender_id,receiver_id,file} = req.body;
+//   console.log("Uuid-1",uuidv4());
+//   console.log("sender_id-3",sender_id);
+//   console.log("reciver_id-4",receiver_id);
+//   console.log("file=-5",file);
+
+//   // const message_id = "0858eab8-85b8-42b3-93de-ea43f40a396d";
+//   // console.log("message-id-2",message_id);
+
+//   // const { sender_id,recevier_id,file}= req.query;
+//   // console.log("sender_d222",sender_id);
+//   // console.log("receiver_id111",recevier_id);
+//   // console.log("files",file);
+//    const sql = `insert into private_message_files (id ,sender_id,receiver_id , filePath ) values ( ? , ?, ?,?)`;
+//   //  console.log("sql",sql);
+//    con.query(sql,[uuidv4(),sender_id,receiver_id,file],(err,result)=>{
+//     if(err){
+//       console.log("error file_uploade",err.message);
+//       return res.json({error:"Failed to save file"})
+//     }
+//     console.log("file upload-sucess77");
+    
+
+
+  
+//     return res.json({success:true,message:"file upload successfully"});
+//    })
+// })
+app.get('/file-fetch', (req, res) => {
+  console.log("@#$!-----");
+  const { sender_id, receiver_id } = req.query;
+  console.log("sender_id",sender_id);
+  console.log("receiver_id",receiver_id);
+
+  const sql = `SELECT filePath FROM private_message_files WHERE sender_id = ? AND receiver_id = ?`;
+  con.query(sql, [sender_id, receiver_id], (err, results) => {
+    if (err) {
+      console.log("error", err.message);
+      
+    }
+
+    if (results.length === 0) {
+      return res.status(404).send("No file found");
+    }
+
+    const blobBuffer = results[0].filePath; 
+    console.log("blobBuffer", blobBuffer);
+    const base64String = blobBuffer.toString('base64');
+    console.log("Base64:", base64String);
+    res.send({
+      file: base64String
+    });
+  });
+});
    
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
  });
+
+
 
 
 
